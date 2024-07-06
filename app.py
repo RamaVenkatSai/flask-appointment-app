@@ -7,32 +7,34 @@ from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 import datetime
+from config import Config
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for the entire application
 
-# If modifying these scopes, delete the file token.pickle.
-SCOPES = ['https://www.googleapis.com/auth/calendar']
-CLIENT_SECRET_FILE = 'credentials.json'
-TOKEN_PICKLE = 'token.pickle'
-
-
 def get_credentials():
     """Gets valid user credentials from storage or initiates OAuth flow to obtain new credentials."""
     creds = None
-    if os.path.exists(TOKEN_PICKLE):
-        with open(TOKEN_PICKLE, 'rb') as token:
+    if os.path.exists(Config.TOKEN_PICKLE):
+        with open(Config.TOKEN_PICKLE, 'rb') as token:
             creds = pickle.load(token)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
+            flow = InstalledAppFlow.from_client_config({
+                "web": {
+                    "client_id": Config.GOOGLE_CLIENT_ID,
+                    "client_secret": Config.GOOGLE_CLIENT_SECRET,
+                    "redirect_uris": ["http://localhost"],
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token"
+                }
+            }, Config.SCOPES)
             creds = flow.run_local_server(port=0)
-        with open(TOKEN_PICKLE, 'wb') as token:
+        with open(Config.TOKEN_PICKLE, 'wb') as token:
             pickle.dump(creds, token)
     return creds
-
 
 @app.route('/create_appointment', methods=['POST'])
 def create_appointment():
@@ -74,7 +76,6 @@ def create_appointment():
         app.logger.error(f"An error occurred: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-
 @app.route('/read_appointments', methods=['GET'])
 def read_appointments():
     try:
@@ -91,7 +92,6 @@ def read_appointments():
         app.logger.error(f"An error occurred: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-
 @app.route('/delete_appointment/<event_id>', methods=['DELETE'])
 def delete_appointment(event_id):
     try:
@@ -104,6 +104,5 @@ def delete_appointment(event_id):
         app.logger.error(f"An error occurred: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=True)
